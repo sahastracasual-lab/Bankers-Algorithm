@@ -1,0 +1,391 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Banker's Algorithm Simulator</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #f1f5f9;
+            color: #1e293b;
+            margin: 0;
+            padding: 25px;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: auto;
+        }
+
+        header {
+            background: #1e3a8a;
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        header h1 {
+            margin-top: 0;
+        }
+
+        .panel {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px #00000010;
+        }
+
+        h2 {
+            color: #1e3a8a;
+            margin-top: 0;
+        }
+
+        .matrix-container {
+            overflow-x: auto;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        th, td {
+            border: 1px solid #cbd5e1;
+            padding: 10px;
+            text-align: center;
+        }
+
+        th {
+            background: #dbeafe;
+        }
+
+        input {
+            width: 65px;
+            padding: 7px;
+            text-align: center;
+            border: 1px solid #94a3b8;
+            border-radius: 5px;
+        }
+
+        .available-inputs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 7px;
+            cursor: pointer;
+            font-size: 15px;
+            margin: 5px 5px 5px 0;
+        }
+
+        button:hover {
+            background: #1d4ed8;
+        }
+
+        .secondary {
+            background: #475569;
+        }
+
+        .safe {
+            color: #166534;
+            background: #dcfce7;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .unsafe {
+            color: #991b1b;
+            background: #fee2e2;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .sequence {
+            font-size: 18px;
+            font-weight: bold;
+            color: #1d4ed8;
+        }
+
+        .note {
+            color: #64748b;
+            font-size: 14px;
+        }
+    </style>
+</head>
+
+<body>
+<div class="container">
+
+    <header>
+        <h1>Banker's Algorithm Simulator</h1>
+        <p>Operating Systems Practical — Deadlock Avoidance</p>
+    </header>
+
+    <section class="panel">
+        <h2>1. Allocation Matrix</h2>
+        <p class="note">Resources currently allocated to each process.</p>
+        <div class="matrix-container" id="allocationTable"></div>
+    </section>
+
+    <section class="panel">
+        <h2>2. Maximum Matrix</h2>
+        <p class="note">Maximum resources each process may require.</p>
+        <div class="matrix-container" id="maximumTable"></div>
+    </section>
+
+    <section class="panel">
+        <h2>3. Available Resources</h2>
+        <div id="availableInputs" class="available-inputs"></div>
+    </section>
+
+    <section class="panel">
+        <button onclick="runBanker()">Run Safety Algorithm</button>
+        <button class="secondary" onclick="resetData()">Reset Sample Data</button>
+    </section>
+
+    <section class="panel">
+        <h2>4. Need Matrix</h2>
+        <p class="note">Need = Maximum − Allocation</p>
+        <div class="matrix-container" id="needTable"></div>
+    </section>
+
+    <section class="panel">
+        <h2>5. Algorithm Result</h2>
+        <div id="result">Click “Run Safety Algorithm” to check the system.</div>
+    </section>
+
+</div>
+
+<script>
+    const processes = 5;
+    const resources = 4;
+
+    const sampleAllocation = [
+        [0, 0, 1, 2],
+        [1, 0, 0, 0],
+        [1, 3, 5, 4],
+        [0, 6, 3, 2],
+        [0, 0, 1, 4]
+    ];
+
+    const sampleMaximum = [
+        [0, 0, 1, 2],
+        [1, 7, 5, 0],
+        [2, 3, 5, 6],
+        [0, 6, 5, 2],
+        [0, 6, 5, 6]
+    ];
+
+    const sampleAvailable = [3, 14, 12, 12];
+
+    function createMatrixTable(containerId, matrix, editable) {
+        let html = "<table><tr><th>Process</th>";
+
+        for (let j = 0; j < resources; j++) {
+            html += `<th>R${j}</th>`;
+        }
+
+        html += "</tr>";
+
+        for (let i = 0; i < processes; i++) {
+            html += `<tr><th>P${i}</th>`;
+
+            for (let j = 0; j < resources; j++) {
+                if (editable) {
+                    html += `<td>
+                        <input type="number" min="0"
+                        id="${containerId}_${i}_${j}"
+                        value="${matrix[i][j]}">
+                    </td>`;
+                } else {
+                    html += `<td>${matrix[i][j]}</td>`;
+                }
+            }
+
+            html += "</tr>";
+        }
+
+        html += "</table>";
+        document.getElementById(containerId).innerHTML = html;
+    }
+
+    function createAvailableInputs(values) {
+        let html = "";
+
+        for (let j = 0; j < resources; j++) {
+            html += `
+                <label>
+                    R${j}
+                    <input type="number" min="0"
+                    id="available_${j}" value="${values[j]}">
+                </label>
+            `;
+        }
+
+        document.getElementById("availableInputs").innerHTML = html;
+    }
+
+    function readMatrix(containerId) {
+        let matrix = [];
+
+        for (let i = 0; i < processes; i++) {
+            let row = [];
+
+            for (let j = 0; j < resources; j++) {
+                const input = document.getElementById(
+                    `${containerId}_${i}_${j}`
+                );
+
+                const value = Number(input.value);
+
+                if (input.value === "" || value < 0 || !Number.isInteger(value)) {
+                    throw new Error("Please enter valid non-negative integers.");
+                }
+
+                row.push(value);
+            }
+
+            matrix.push(row);
+        }
+
+        return matrix;
+    }
+
+    function readAvailable() {
+        let available = [];
+
+        for (let j = 0; j < resources; j++) {
+            const input = document.getElementById(`available_${j}`);
+            const value = Number(input.value);
+
+            if (input.value === "" || value < 0 || !Number.isInteger(value)) {
+                throw new Error("Please enter valid Available resource values.");
+            }
+
+            available.push(value);
+        }
+
+        return available;
+    }
+
+    function displayNeedMatrix(need) {
+        createMatrixTable("needTable", need, false);
+    }
+
+    function runBanker() {
+        try {
+            const allocation = readMatrix("allocationTable");
+            const maximum = readMatrix("maximumTable");
+            const available = readAvailable();
+
+            const need = [];
+
+            for (let i = 0; i < processes; i++) {
+                need[i] = [];
+
+                for (let j = 0; j < resources; j++) {
+                    if (maximum[i][j] < allocation[i][j]) {
+                        throw new Error(
+                            `Maximum cannot be less than Allocation for P${i}, R${j}.`
+                        );
+                    }
+
+                    need[i][j] = maximum[i][j] - allocation[i][j];
+                }
+            }
+
+            displayNeedMatrix(need);
+
+            let work = [...available];
+            let finish = Array(processes).fill(false);
+            let safeSequence = [];
+
+            let progress = true;
+
+            while (safeSequence.length < processes && progress) {
+                progress = false;
+
+                for (let i = 0; i < processes; i++) {
+                    if (finish[i]) continue;
+
+                    let possible = true;
+
+                    for (let j = 0; j < resources; j++) {
+                        if (need[i][j] > work[j]) {
+                            possible = false;
+                            break;
+                        }
+                    }
+
+                    if (possible) {
+                        for (let j = 0; j < resources; j++) {
+                            work[j] += allocation[i][j];
+                        }
+
+                        finish[i] = true;
+                        safeSequence.push(`P${i}`);
+                        progress = true;
+                    }
+                }
+            }
+
+            const result = document.getElementById("result");
+
+            if (safeSequence.length === processes) {
+                result.innerHTML = `
+                    <div class="safe">
+                        <h3>System is in a SAFE state.</h3>
+                        <p>A safe sequence exists:</p>
+                        <div class="sequence">
+                            ${safeSequence.join(" → ")}
+                        </div>
+                    </div>
+                `;
+            } else {
+                result.innerHTML = `
+                    <div class="unsafe">
+                        <h3>System is in an UNSAFE state.</h3>
+                        <p>No safe sequence could be found for the entered values.</p>
+                    </div>
+                `;
+            }
+
+        } catch (error) {
+            document.getElementById("result").innerHTML = `
+                <div class="unsafe">${error.message}</div>
+            `;
+        }
+    }
+
+    function resetData() {
+        createMatrixTable("allocationTable", sampleAllocation, true);
+        createMatrixTable("maximumTable", sampleMaximum, true);
+        createAvailableInputs(sampleAvailable);
+
+        document.getElementById("needTable").innerHTML = "";
+        document.getElementById("result").innerHTML =
+            'Click “Run Safety Algorithm” to check the system.';
+    }
+
+    resetData();
+</script>
+
+</body>
+</html>
+
